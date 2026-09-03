@@ -1,9 +1,9 @@
-from datetime import date, datetime  # remove `timezone` from this import, you don't need it anymore
+from datetime import date, datetime  
 from decimal import Decimal
 from enum import Enum
 from typing import Dict
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from .constants import ECB_TZ  # add this import
+from .constants import ECB_TZ 
 class ErrorCode(str, Enum):
     INVALID_INPUT = "INVALID_INPUT"
     UNSUPPORTED_CURRENCY = "UNSUPPORTED_CURRENCY"
@@ -20,6 +20,8 @@ class ConvertRequest(BaseModel):
     from_currency: str = Field(..., alias="from", pattern=r"^[A-Z]{3}$")
     to_currency: str = Field(..., alias="to", pattern=r"^[A-Z]{3}$")
     asked_date: date = Field(..., alias="date")
+
+    model_config = ConfigDict(populate_by_name=True)
 
     @field_validator("amount")
     @classmethod
