@@ -40,7 +40,7 @@ The test suite runs completely offline by mocking the upstream HTTP client, ensu
 
 ## API Endpoint
 
-### `GET /tools/convert`
+### `GET /convert`
 
 **Query Parameters:**
 
