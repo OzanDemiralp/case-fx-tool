@@ -1,41 +1,55 @@
-# Case study — Junior Software Engineer at mangolab
+# FX Converter Tool for AI Agents
 
-Two small tasks, **about two and a half hours in total.** Please do not spend
-your weekend on this. If you run out of time, stop and write down what you would
-have done next — that answer counts too.
-
-Use Claude Code, Cursor, Copilot — whatever you normally use. That is how we work
-every day, and we would rather see you use it well than watch you avoid it. The
-only thing we ask is that you know your own code.
-
-**Start by clicking "Use this template"** to create your own repository, then
-work there.
+A robust, production-ready currency conversion HTTP service built with **Python & FastAPI**, designed to be called safely by AI agents. It uses European Central Bank (ECB) rates via the public [Frankfurter API](https://api.frankfurter.dev).
 
 ---
 
-## Part A — build (about 90 minutes)
+## Quick Start
 
-A small HTTP service — Python + FastAPI preferred, TypeScript is fine — with one
-endpoint an AI agent could call as a tool:
+### Prerequisites
+
+- Python 3.10+
+- A virtual environment (`venv`) set up in the root directory.
+
+### Running the Service
+
+The service uses `./run.sh` as required. It respects the following environment variables:
+
+- `PORT` (default: `8080`)
+- `FX_UPSTREAM_BASE` (default: `https://api.frankfurter.dev`)
+
+```bash
+# Start the service using the provided script
+./run.sh
 
 ```
-GET /tools/convert?amount=250&from=EUR&to=TRY&date=2026-08-28
+
+---
+
+## Running Tests
+
+The test suite runs completely offline by mocking the upstream HTTP client, ensuring tests pass with zero network dependency.
+
+```bash
+# Run tests using the provided script
+./test.sh
+
 ```
 
-It answers using the public [Frankfurter API](https://frankfurter.dev) —
-European Central Bank rates, no API key, no signup.
+---
 
-### Three things are fixed, so that we can run every submission the same way
+## API Endpoint
 
-| | |
-|---|---|
-| Upstream URL | from the `FX_UPSTREAM_BASE` environment variable, defaulting to `https://api.frankfurter.dev`. **Nothing may hardcode the real host** — we point this at a fake upstream when reviewing. |
-| Port | from the `PORT` environment variable, default `8080` |
-| Scripts | `./run.sh` starts the service, `./test.sh` runs the tests. Both are in this template, unimplemented. |
+### `GET /tools/convert`
 
-### The response
+**Query Parameters:**
 
-On success, 200 with:
+- `amount` (float, required): The amount to convert (must be > 0, max 9 decimal places).
+- `from` (string, required): Source 3-letter currency code (e.g., `EUR`).
+- `to` (string, required): Target 3-letter currency code (e.g., `TRY`).
+- `date` (string, required): Target date in `YYYY-MM-DD` format.
+
+**Success Response (`200 OK`):**
 
 ```json
 {
@@ -50,80 +64,49 @@ On success, 200 with:
 }
 ```
 
-`rate_date` is **the date the rate you used actually belongs to.** `asked_date`
-is what the caller asked for. They are not always the same, and that difference
-is the point of this task.
-
-On failure, a non-2xx status and:
-
-```json
-{ "error": "<short_machine_code>", "message": "<a sentence a person could read>" }
-```
-
-List your error codes in your README.
-
-### The part that matters
-
-The caller is a language model talking to a paying customer, so **a wrong number
-is worse than no number.** Decide — and implement — what happens when:
-
-- the ECB published no rate for the date asked (weekends, holidays);
-- the date is in the future, or before the series starts;
-- the currency code does not exist, or `from` and `to` are the same;
-- the upstream is slow, returns 500, or returns something that is not JSON;
-- `amount` is missing, zero, negative, or has ten decimal places.
-
-Your endpoint must never invent a rate, and must never present a rate as
-belonging to a date it does not belong to. Note that the upstream itself tells
-you which date its rates are from — read it. If you choose to answer with an
-earlier published rate, the response has to make that visible, because the model
-has to be able to tell the customer which day the number is from.
-
-### Also required
-
-- **Tests that pass with no network at all** — fake the upstream. We run
-  `./test.sh` with `FX_UPSTREAM_BASE` pointing at a closed port.
-- A README of your own we can follow in under a minute: how to run it, how to
-  run the tests, your error codes, and what your endpoint does in each of the
-  cases above.
-- A repeat of the same question should not re-ask the upstream.
-- `NOTES.md`, one page. The skeleton is in this repo.
-
-### Not required, not scored
-
-Auth, a database, a UI, a Dockerfile, CI, deployment, more endpoints. Adding them
-will not help you; a smaller thing done carefully will.
-
 ---
 
-## Part B — review (about 45 minutes)
+## Edge Case Handling
 
-`tool.py` in this repository is a working version of the same service, written
-quickly with an AI assistant. It runs. **Review it as if it were going live
-tomorrow for a customer who pays us.**
+Since this service feeds data to an AI agent talking to paying customers, accuracy and transparency are prioritized over guesswork:
 
-Fill in `REVIEW.md`, one page:
+1. **Weekends & Holidays (No Rate Published):**
 
-- what is wrong, and what it does to a **customer** — not to a linter;
-- how you would verify each finding;
-- your findings **ranked**, and which single one you would fix before shipping
-  tonight.
+- The ECB does not publish rates on weekends or public holidays. The upstream Frankfurter API natively resolves this by returning the most recently available prior published rate. Our service captures this and exposes the exact distinction via `rate_date` (the actual rate day) versus `asked_date` (what the caller requested) so the model can inform the user transparently.
 
-Fewer findings, ranked and explained, beat a long list. If something looks
-suspicious but is actually fine, saying so is worth as much as finding a real
-defect.
+2. **Future Dates / Out-of-Range Dates:**
 
----
+- Requests with future dates or dates preceding the ECB series start (`1999-01-04`) are validated and rejected upfront. Rates are never invented.
 
-## Submitting
+3. **Invalid or Identical Currencies:**
 
-Reply to our email with a link to your repository. Commit in small steps — the
-history is part of what we read. Five days is plenty; if you need more, just say
-so.
+- If `from` and `to` are identical, or if a currency code is unrecognized, the request is safely rejected with a descriptive error.
 
-Any question about this brief, ask. An unclear requirement is our fault, not a
-test.
+4. **Upstream Failures & Timeouts:**
 
----
+- Timeouts, 500-level errors, or malformed/non-JSON payloads from the upstream are caught and mapped safely to clean downstream error responses.
 
-<sub>mangolab — Mango Yazılım Teknolojileri Ltd. Şti. · [mangolab.ai/careers](https://mangolab.ai/careers)</sub>
+5. **Amount Validation:**
+
+- Missing, zero, negative, or excessively granular amounts (10+ decimal places) are blocked at the request validation layer.
+
+6. **Smart Caching:**
+
+- Historical rates are cached indefinitely (as they are immutable), while provisional/current-day rates use a 5-minute TTL to balance freshness and rate limits.
+
+## Error Codes
+
+When a request fails, the service returns a non-2xx status code alongside a structured JSON error body containing a machine-readable code and a human-readable message.
+
+- **`INVALID_INPUT`** (`400 Bad Request`)
+  Missing parameters, malformed query syntax, invalid amounts (less than or equal to 0, or 10 or more decimals), or invalid dates (future dates or pre-1999).
+- **`SAME_CURRENCY`** (`400 Bad Request`)
+  The `from` and `to` currency codes are identical.
+- **`UNSUPPORTED_CURRENCY`** (`404 Not Found`)
+  The requested currency code is unrecognized or unsupported by the upstream provider.
+- **`RATE_UNAVAILABLE`** (`404 Not Found`)
+  No historical rate data could be found for the target currency on the requested date.
+- **`UPSTREAM_TIMEOUT`** (`504 Gateway Timeout`)
+  The upstream Frankfurter API request timed out.
+- **`UPSTREAM_ERROR`** (`502 Bad Gateway`)
+  The upstream API returned a 5xx server error, unexpected status code, or malformed non-JSON data.
