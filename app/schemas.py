@@ -1,10 +1,9 @@
-from datetime import date, datetime, timezone
+from datetime import date, datetime  # remove `timezone` from this import, you don't need it anymore
 from decimal import Decimal
 from enum import Enum
 from typing import Dict
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-
-
+from .constants import ECB_TZ  # add this import
 class ErrorCode(str, Enum):
     INVALID_INPUT = "INVALID_INPUT"
     UNSUPPORTED_CURRENCY = "UNSUPPORTED_CURRENCY"
@@ -32,7 +31,7 @@ class ConvertRequest(BaseModel):
     @field_validator("asked_date")
     @classmethod
     def validate_date_bounds(cls, v: date) -> date:
-        if v > datetime.now(timezone.utc).date():
+        if v > datetime.now(ECB_TZ).date():
             raise ValueError("Date cannot be in the future.")
         if v < date(1999, 1, 4):
             raise ValueError("Date cannot be before 1999-01-04 (ECB series start).")
