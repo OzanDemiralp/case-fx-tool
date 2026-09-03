@@ -19,23 +19,23 @@ class ConvertRequest(BaseModel):
     """Validates incoming query parameters."""
     amount: Decimal = Field(..., gt=0)
     from_currency: str = Field(..., alias="from", pattern=r"^[A-Z]{3}$")
-    to_currency: str = Field(..., alias="from", pattern=r"^[A-Z]{3}$")
+    to_currency: str = Field(..., alias="to", pattern=r"^[A-Z]{3}$")
     asked_date: date = Field(..., alias="date")
 
     @field_validator("amount")
     @classmethod
     def validate_amount_decimals(cls, v: Decimal) -> Decimal:
-        # Check if the amount has 10 or more decimal places
         if abs(v.as_tuple().exponent) >= 10:
             raise ValueError("Amount cannot have 10 or more decimal places.")
         return v
 
     @field_validator("asked_date")
     @classmethod
-    def validate_date_not_in_future(cls, v: date) -> date:
-        # Reject future-dated requests, rates aren't available yet
+    def validate_date_bounds(cls, v: date) -> date:
         if v > datetime.now(timezone.utc).date():
             raise ValueError("Date cannot be in the future.")
+        if v < date(1999, 1, 4):
+            raise ValueError("Date cannot be before 1999-01-04 (ECB series start).")
         return v
 
 
